@@ -1,9 +1,6 @@
 package com.nami.shader;
 
 import com.nami.Material;
-import com.nami.PointLight;
-import com.nami.logger.NLogger;
-import com.nami.render.Camera;
 import org.joml.Matrix4f;
 import org.joml.Vector3f;
 import org.lwjgl.BufferUtils;
@@ -56,33 +53,11 @@ public class UniformManager {
         setUniform(name.concat(".shininess"), material.shininess());
     }
 
-    public boolean createPointLightUniform(String name) {
-        return createUniform(name + ".position") &&
-                createUniform(name + ".color") &&
-                createUniform(name + ".intensity");
-    }
-
-    public void setUniform(String name, PointLight light) {
-        setUniform(name.concat(".position"), light.position());
-        setUniform(name.concat(".color"), light.color());
-        setUniform(name.concat(".intensity"), light.intensity());
-    }
-
-    public boolean createCameraUniform(String name) {
-        return createUniform(name + ".position") &&
-                createUniform(name + ".rotation");
-    }
-
-    public void setUniform(String name, Camera camera) {
-        setUniform(name.concat(".position"), camera.getPosition());
-        setUniform(name.concat(".rotation"), camera.getRotation());
-    }
-
     public boolean createUniform(String name) {
         int location = glGetUniformLocation(shader.id(), name);
         boolean valid = (location != -1);
         if (!valid)
-            NLogger.err(this, "Uniform with name '" + name + "' doesn't exist!");
+            System.err.println("Uniform with name '" + name + "' doesn't exist!");
         locations.put(name, location);
         return valid;
     }

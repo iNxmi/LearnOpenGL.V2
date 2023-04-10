@@ -1,7 +1,6 @@
 package com.nami;
 
 import com.nami.config.Config;
-import com.nami.logger.NLogger;
 import com.nami.render.*;
 import com.nami.render.Window;
 import com.nami.shader.ShaderProgram;
@@ -11,8 +10,6 @@ import org.lwjgl.glfw.GLFWFramebufferSizeCallback;
 import org.lwjgl.opengl.GL;
 
 import javax.imageio.ImageIO;
-import java.awt.*;
-import java.awt.geom.AffineTransform;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
@@ -24,18 +21,19 @@ import static org.lwjgl.opengl.GL33.*;
 
 public class Main {
 
-    private final Config config = Config.load("./src/main/java/com/nami/config/config.json");
-    private Window window;
-    private ShaderProgram objShader;
-    private Entity[] entities;
-    private PointLight light;
-    private Camera camera;
-
     public static float DELTA_TIME;
+    private final Config config;
+    private final Window window;
+    private final ShaderProgram objShader;
+    private final Entity skybox;
+    private final Entity[] entities;
+    private final Camera camera;
 
     public Main() throws Exception {
-        NLogger.init("E:/Windows/Desktop");
-        NLogger.out(this, config);
+        this.config = Config.load("./src/main/java/com/nami/config/config.json");
+        System.out.println(config);
+
+        sensi = config.user().sensivity();
 
         window = Window.builder().config(config.window(), config.render()).title("LearnOpenGL.V2").build();
         window.init();
@@ -45,7 +43,9 @@ public class Main {
         GL.createCapabilities();
         glEnable(GL_DEPTH_TEST);
         glClearColor(0.2f, 0.2f, 0.2f, 1.0f);
-        glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+        glPolygonMode(GL_FRONT, GL_FILL);
+
+        System.out.println(glGetString(GL_VERSION));
 
         glfwSetFramebufferSizeCallback(window.id(), new GLFWFramebufferSizeCallback() {
             @Override
@@ -53,6 +53,9 @@ public class Main {
                 glViewport(0, 0, width, height);
             }
         });
+
+        glfwSetInputMode(window.id(), GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+        glfwSetCursorPosCallback(window.id(), (win, x, y) -> mouseMoveInput((float) x, (float) y));
 
         glfwSetKeyCallback(window.id(), (window, key, scancode, action, mods) -> {
             if (action != GLFW_PRESS)
@@ -63,8 +66,8 @@ public class Main {
                 glfwSetWindowShouldClose(this.window.id(), true);
 
             //Fullscreen
-            //if (key == config.controls().fullscreen())
-            //    window.setFullscreen(glfwGetWindowMonitor(id) == NULL);
+//            if (key == config.controls().fullscreen())
+
 
             //Screenshot
             if (key == config.controls().screenshot()) {
@@ -78,19 +81,15 @@ public class Main {
 
                 int[] pixels = new int[width * height];
                 for (int i = 0; i < pixels.length; i++)
-                    pixels[i] = (buffer.get() << 16) + (buffer.get() << 8) + (buffer.get());
+                    pixels[i] = ((buffer.get() & 0xff) << 16) + ((buffer.get() & 0xff) << 8) + (buffer.get() & 0xff);
 
-                BufferedImage rawImg = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
-                rawImg.setRGB(0, 0, width, height, pixels, 0, width);
+                int[] pixelsFlipped = new int[width * height];
+                for (int y = 0; y < height; y++)
+                    if (width >= 0)
+                        System.arraycopy(pixels, ((height - 1) - y) * width, pixelsFlipped, y * width, width);
 
                 BufferedImage img = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
-                AffineTransform tran = AffineTransform.getTranslateInstance(0, height);
-                AffineTransform flip = AffineTransform.getScaleInstance(1, -1);
-                tran.concatenate(flip);
-                Graphics2D g = img.createGraphics();
-                g.setTransform(tran);
-                g.drawImage(rawImg, 0, 0, null);
-                g.dispose();
+                img.setRGB(0, 0, width, height, pixelsFlipped, 0, width);
 
                 File file = new File("E:/Windows/Desktop/" + System.currentTimeMillis() + ".png");
                 try {
@@ -99,33 +98,36 @@ public class Main {
                     throw new RuntimeException(e);
                 }
 
-                NLogger.out(this, "Screenshot saved! " + file.getAbsolutePath());
+                System.out.println("Screenshot saved! " + file.getAbsolutePath());
             }
         });
 
-        objShader = new ShaderProgram("./src/main/java/com/nami/shader/object.vert", "./src/main/java/com/nami/shader/object.frag");
+        objShader = new ShaderProgram("./src/main/java/com/nami/shader/shader.vert", "./src/main/java/com/nami/shader/shader.frag");
         objShader.init();
         objShader.uniformManager().createUniform("projectionMatrix");
         objShader.uniformManager().createUniform("viewMatrix");
         objShader.uniformManager().createUniform("worldMatrix");
         objShader.uniformManager().createMaterialUniform("material");
 
-        camera = new Camera(config.user().fov(), config.window().aspect().aspect(), 0.01f, 1000.0f);
+        camera = new Camera(new Vector3f(0, 0, 0), config.user().fov(), config.window().aspect().aspect(), 0.01f, 100.0f, 0, 0);
 
-        Texture texture = new Texture("./src/main/resources/com/nami/textures/dirt.png", Texture.TextureFilter.NEAREST);
-        Texture textureSpecular = new Texture("./src/main/resources/com/nami/textures/diamond_ore.png", Texture.TextureFilter.NEAREST);
+        Texture texture = new Texture("./src/main/resources/com/nami/textures/container.png", Texture.TextureFilter.NEAREST);
+        Texture textureSpecular = new Texture("./src/main/resources/com/nami/textures/diamond_block.png", Texture.TextureFilter.NEAREST);
         Material material = new Material(texture, textureSpecular, 1);
         Mesh mesh = new Mesh("./src/main/resources/com/nami/models/cube.obj");
         Model model = new Model(mesh, material);
 
-        entities = new Entity[100];
+        skybox = new Entity(model);
+        skybox.getScale().set(50, 50, 50);
+
+        float radius = 15;
+        entities = new Entity[8];
         for (int i = 0; i < entities.length; i++) {
             Entity entity = new Entity(model);
-            entity.setPosition((float) (20 - Math.random() * 40), (float) (30 - Math.random() * 30), (float) (Math.random() * -20));
+            entity.getPosition().set((float) ((radius / 2) - (Math.random() * radius)), (float) ((radius / 2) - (Math.random() * radius)), (float) ((radius / 2) - (Math.random() * radius)));
+            entity.getRotation().set((float) Math.random() * 360, (float) Math.random() * 360, (float) Math.random() * 360);
             entities[i] = entity;
         }
-
-        light = new PointLight(new Vector3f(-4, 0, -10), new Vector3f(1, 1, 1), 1);
 
         glfwShowWindow(window.id());
 
@@ -170,51 +172,7 @@ public class Main {
                 timer += 1000;
             }
         }
-
-        NLogger.close();
         glfwTerminate();
-    }
-
-    private final float movementSpeed = 10.0f, rotationSpeed = 50.0f;
-
-    private void input() {
-        /*//Movement
-        if (glfwGetKey(window.id(), GLFW_KEY_W) == GLFW_PRESS)
-            objEntity.movePosition(0, 0, -movementSpeed * DELTA_TIME);
-        if (glfwGetKey(window.id(), GLFW_KEY_A) == GLFW_PRESS)
-            objEntity.movePosition(-movementSpeed * DELTA_TIME, 0, 0);
-        if (glfwGetKey(window.id(), GLFW_KEY_S) == GLFW_PRESS)
-            objEntity.movePosition(0, 0, movementSpeed * DELTA_TIME);
-        if (glfwGetKey(window.id(), GLFW_KEY_D) == GLFW_PRESS)
-            objEntity.movePosition(movementSpeed * DELTA_TIME, 0, 0);
-
-        //Rotation
-        if (glfwGetKey(window.id(), GLFW_KEY_UP) == GLFW_PRESS)
-            objEntity.moveRotation(-rotationSpeed * DELTA_TIME, 0, 0);
-        if (glfwGetKey(window.id(), GLFW_KEY_LEFT) == GLFW_PRESS)
-            objEntity.moveRotation(0, -rotationSpeed * DELTA_TIME, 0);
-        if (glfwGetKey(window.id(), GLFW_KEY_DOWN) == GLFW_PRESS)
-            objEntity.moveRotation(rotationSpeed * DELTA_TIME, 0, 0);
-        if (glfwGetKey(window.id(), GLFW_KEY_RIGHT) == GLFW_PRESS)
-            objEntity.moveRotation(0, rotationSpeed * DELTA_TIME, 0);*/
-    }
-
-    private void update() {
-        for (int i = 0; i < entities.length; i++)
-            entities[i].moveRotation(rotationSpeed * DELTA_TIME * i, rotationSpeed * DELTA_TIME * i, rotationSpeed * DELTA_TIME * i);
-    }
-
-    private void render() {
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-        objShader.bind();
-        objShader.uniformManager().setUniform("projectionMatrix", camera.getProjectionMatrix());
-        objShader.uniformManager().setUniform("viewMatrix", camera.getViewMatrix());
-        for (Entity e : entities)
-            e.render(objShader);
-        objShader.unbind();
-
-        glfwSwapBuffers(window.id());
     }
 
     public static void main(String[] args) {
@@ -223,6 +181,78 @@ public class Main {
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
+    }
+
+    float lX, lY;
+    float sensi;
+    float yaw, pitch;
+
+    private void mouseMoveInput(float x, float y) {
+        float oX = x - lX;
+        float oY = y - lY;
+
+        lX = x;
+        lY = y;
+
+        yaw += oX * sensi;
+        pitch -= oY * sensi;
+
+        if (pitch > 89)
+            pitch = 89;
+        if (pitch < -89)
+            pitch = -89;
+
+        camera.setYaw(yaw);
+        camera.setPitch(pitch);
+    }
+
+    private final float movementSpeed = 10.0f;
+
+    private void input() {
+        //Movement
+        Vector3f front = new Vector3f();
+        camera.getFront().mul(movementSpeed * DELTA_TIME, front);
+        if (glfwGetKey(window.id(), GLFW_KEY_W) == GLFW_PRESS)
+            camera.getPosition().add(front);
+        if (glfwGetKey(window.id(), GLFW_KEY_S) == GLFW_PRESS)
+            camera.getPosition().sub(front);
+
+        Vector3f side = new Vector3f();
+        camera.getFront().cross(new Vector3f(0, 1, 0), side);
+        side.normalize();
+        side.mul(movementSpeed * DELTA_TIME);
+        if (glfwGetKey(window.id(), GLFW_KEY_A) == GLFW_PRESS)
+            camera.getPosition().sub(side);
+        if (glfwGetKey(window.id(), GLFW_KEY_D) == GLFW_PRESS)
+            camera.getPosition().add(side);
+
+        if (glfwGetKey(window.id(), GLFW_KEY_SPACE) == GLFW_PRESS)
+            camera.getPosition().add(0, movementSpeed * DELTA_TIME, 0);
+        if (glfwGetKey(window.id(), GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS)
+            camera.getPosition().add(0, -movementSpeed * DELTA_TIME, 0);
+    }
+
+    private void update() {
+
+    }
+
+    private void render() {
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+        objShader.bind();
+        objShader.uniformManager().setUniform("projectionMatrix", camera.getProjectionMatrix());
+        objShader.uniformManager().setUniform("viewMatrix", camera.getViewMatrix());
+
+        Vector3f position = camera.getPosition();
+        skybox.getPosition().set(position.x, position.y, position.z);
+        skybox.render(objShader);
+
+        for (Entity e : entities)
+            e.render(objShader);
+
+        objShader.unbind();
+
+        glfwSwapBuffers(window.id());
     }
 
 }
