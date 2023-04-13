@@ -9,8 +9,7 @@ public class Camera {
     private final Vector3f position;
     private float fov, aspect, zNear, zFar, yaw, pitch;
 
-    public Camera(Vector3f position, float fovDeg, float aspect, float zNear, float zFar, float yawDeg,
-                  float pitchDeg) {
+    public Camera(Vector3f position, float fovDeg, float aspect, float zNear, float zFar, float yawDeg, float pitchDeg) {
         this.position = position;
 
         this.fov = (float) Math.toRadians(fovDeg);
@@ -22,39 +21,16 @@ public class Camera {
         this.pitch = (float) Math.toRadians(pitchDeg);
     }
 
-    public void setFov(float fovDeg) {
-        this.fov = (float) Math.toRadians(fovDeg);
-    }
-
-    public void setAspect(float aspect) {
-        this.aspect = aspect;
-    }
-
-    public void setZNear(float zNear) {
-        this.zNear = zNear;
-    }
-
-    public void setZFar(float zFar) {
-        this.zFar = zFar;
-    }
-
-    public void setYaw(float yawDeg) {
-        this.yaw = (float) Math.toRadians(yawDeg);
-    }
-
-    public void setPitch(float pitchDeg) {
-        this.pitch = (float) Math.toRadians(pitchDeg);
-    }
-
     public Vector3f getPosition() {
         return position;
     }
 
     private final Vector3f front = new Vector3f();
     private float oYaw, oPitch;
-    private boolean f;
+    private boolean f = false;
 
     public Vector3f getFront() {
+        float yaw = getYawRad(), pitch = getPitchRad();
         if (oYaw == yaw && oPitch == pitch && f)
             return front;
 
@@ -72,21 +48,17 @@ public class Camera {
 
     private final Vector3f target = new Vector3f();
     private final Vector3f oPos = new Vector3f(), oFront = new Vector3f();
-    private boolean t;
+    private boolean t = false;
 
     public Vector3f getTarget() {
-        Vector3f front = getFront();
+        Vector3f position = getPosition(), front = getFront();
         if (oPos.equals(position) && oFront.equals(front) && t)
             return target;
 
         position.add(front, target);
 
-        oPos.x = position.x;
-        oPos.y = position.y;
-        oPos.z = position.z;
-        oFront.x = front.x;
-        oFront.y = front.y;
-        oFront.z = front.z;
+        oPos.set(position);
+        oFront.set(front);
 
         if (!t)
             t = true;
@@ -95,26 +67,19 @@ public class Camera {
     }
 
     private final Matrix4f viewMatrix = new Matrix4f();
-    private final Vector3f oTar = new Vector3f(), oUp = new Vector3f();
-    private boolean vm;
+    private final Vector3f oTar = new Vector3f();
+    private boolean vm = false;
 
     public Matrix4f getViewMatrix() {
-        Vector3f target = getTarget();
-        if (oPos.equals(position, 0) && oTar.equals(target, 0) && oUp.equals(UP, 0) && vm)
+        Vector3f position = getPosition(), target = getTarget();
+        if (oPos.equals(position, 0) && oTar.equals(target, 0) && vm)
             return viewMatrix;
 
         viewMatrix.identity();
         viewMatrix.lookAt(position, target, UP);
 
-        oPos.x = position.x;
-        oPos.y = position.y;
-        oPos.z = position.z;
-        oTar.x = target.x;
-        oTar.y = target.y;
-        oTar.z = target.z;
-        oUp.x = UP.x;
-        oUp.y = UP.y;
-        oUp.z = UP.z;
+        oPos.set(position);
+        oTar.set(target);
 
         if (!vm)
             vm = true;
@@ -124,9 +89,10 @@ public class Camera {
 
     private final Matrix4f projectionMatrix = new Matrix4f();
     private float oFov, oAspect, oZNear, oZFar;
-    private boolean pm;
+    private boolean pm = false;
 
     public Matrix4f getProjectionMatrix() {
+        float fov = getFovRad(), aspect = getAspect(), zNear = getZNear(), zFar = getZFar();
         if (fov == oFov && aspect == oAspect && zNear == oZNear && zFar == oZFar && pm)
             return projectionMatrix;
 
@@ -142,6 +108,66 @@ public class Camera {
             pm = true;
 
         return projectionMatrix;
+    }
+
+    public float getFovDeg() {
+        return (float) Math.toDegrees(fov);
+    }
+
+    public float getFovRad() {
+        return fov;
+    }
+
+    public void setFov(float fovDeg) {
+        this.fov = (float) Math.toRadians(fovDeg);
+    }
+
+    public float getAspect() {
+        return aspect;
+    }
+
+    public void setAspect(float aspect) {
+        this.aspect = aspect;
+    }
+
+    public float getZNear() {
+        return zNear;
+    }
+
+    public void setZNear(float zNear) {
+        this.zNear = zNear;
+    }
+
+    public float getZFar() {
+        return zFar;
+    }
+
+    public void setZFar(float zFar) {
+        this.zFar = zFar;
+    }
+
+    public float getYawDeg() {
+        return (float) Math.toDegrees(yaw);
+    }
+
+    public float getYawRad() {
+        return yaw;
+    }
+
+    public void setYaw(float yawDeg) {
+        this.yaw = (float) Math.toRadians(yawDeg);
+    }
+
+    public float getPitchDeg() {
+        return (float) Math.toDegrees(pitch);
+    }
+
+    public float getPitchRad() {
+        return pitch;
+    }
+
+    public void setPitch(float pitchDeg) {
+        this.pitch = (float) Math.toRadians(pitchDeg);
     }
 
 }

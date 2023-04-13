@@ -1,22 +1,22 @@
 #version 330 core
-layout (location = 0) in vec3 aPos;
-layout (location = 1) in vec3 aNor;
-layout (location = 2) in vec2 aTex;
+layout (location = 0) in vec3 lPos;
+layout (location = 1) in vec3 lNor;
+layout (location = 2) in vec2 lTex;
 
 uniform mat4 projectionMatrix;
 uniform mat4 viewMatrix;
 uniform mat4 worldMatrix;
 
-out vec3 bPos;
-out vec3 bNor;
-out vec2 bTex;
-out vec3 fragPos;
+out vec3 vPos;
+out vec3 vNor;
+out vec2 vTex;
 
 void main() {
-    bPos = aPos;
-    bNor = aNor;
-    bTex = aTex;
-    fragPos = vec3(worldMatrix * vec4(aPos, 1.0));
+    vec4 wPos = worldMatrix * vec4(lPos, 1.0);
 
-    gl_Position = projectionMatrix * viewMatrix * worldMatrix * vec4(aPos, 1.0);
+    vPos = vec3(wPos);
+    vNor = vec3(worldMatrix * vec4(lNor, 0.0));
+    vTex = lTex;
+
+    gl_Position = projectionMatrix * viewMatrix * wPos;
 }

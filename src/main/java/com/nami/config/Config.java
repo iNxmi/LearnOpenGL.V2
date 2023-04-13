@@ -5,7 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
 import java.nio.file.Paths;
 
-public record Config(WindowConfig window, UserConfig user, RenderConfig render, ControlConfig controls) {
+public record Config(WindowConfig window, UserConfig user, ControlConfig controls) {
 
     public static Config load(String path) {
         try {

@@ -8,15 +8,12 @@
     },
     "monitor": "0",
     "fps": "144",
-    "vsync": "false",
+    "vsync": "true",
     "fullscreen": "false"
   },
   "user": {
     "fov": "90",
     "sensivity": "0.1"
-  },
-  "render": {
-    "msaa": "8"
   },
   "controls": {
     "forward": "87",

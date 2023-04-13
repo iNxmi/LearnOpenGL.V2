@@ -1,6 +1,6 @@
 package com.nami.shader;
 
-import com.nami.IOpenGL;
+import org.joml.Matrix4f;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -9,20 +9,14 @@ import java.nio.file.Paths;
 import static org.lwjgl.opengl.GL20.*;
 import static org.lwjgl.opengl.GL20.glDeleteShader;
 
-public class ShaderProgram implements IOpenGL {
-
-    private String vsPath, fsPath;
+public abstract class ShaderProgram {
 
     private int id;
+    private int uProjectionMatrix, uViewMatrix, uWorldMatrix;
 
     private UniformManager uniformManager;
 
-    public ShaderProgram(String vsPath, String fsPath) {
-        this.vsPath = vsPath;
-        this.fsPath = fsPath;
-    }
-
-    public void init() throws IOException {
+    public ShaderProgram(String vsPath, String fsPath) throws Exception {
         this.uniformManager = new UniformManager(this);
 
         int vs = compile(vsPath, GL_VERTEX_SHADER);
@@ -31,7 +25,15 @@ public class ShaderProgram implements IOpenGL {
         this.id = link(vs, fs);
 
         delete(vs, fs);
+
+        uProjectionMatrix = getUniformManager().getLocation("projectionMatrix");
+        uViewMatrix = getUniformManager().getLocation("viewMatrix");
+        uWorldMatrix = getUniformManager().getLocation("worldMatrix");
+
+        getUniformLocations(getUniformManager());
     }
+
+    public abstract void getUniformLocations(UniformManager uniformManager) throws Exception;
 
     private int compile(String path, int type) throws IOException {
         String vsCode = new String(Files.readAllBytes(Paths.get(path)));
@@ -63,23 +65,32 @@ public class ShaderProgram implements IOpenGL {
             glDeleteShader(s);
     }
 
-    @Override
     public int id() {
         return id;
     }
 
-    @Override
     public void bind() {
         glUseProgram(id);
     }
 
-    @Override
-    public void unbind() {
-        glUseProgram(0);
+    public UniformManager getUniformManager() {
+        return uniformManager;
     }
 
-    public UniformManager uniformManager() {
-        return uniformManager;
+    public void setProjectionMatrix(Matrix4f projectionMatrix) {
+        getUniformManager().setUniform(uProjectionMatrix, projectionMatrix);
+    }
+
+    public void setViewMatrix(Matrix4f viewMatrix) {
+        getUniformManager().setUniform(uViewMatrix, viewMatrix);
+    }
+
+    public void setWorldMatrix(Matrix4f worldMatrix) {
+        getUniformManager().setUniform(uWorldMatrix, worldMatrix);
+    }
+
+    public void unbind() {
+        glUseProgram(0);
     }
 
 }
