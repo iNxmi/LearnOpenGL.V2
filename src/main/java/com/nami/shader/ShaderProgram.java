@@ -1,7 +1,5 @@
 package com.nami.shader;
 
-import org.joml.Matrix4f;
-
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
@@ -12,8 +10,6 @@ import static org.lwjgl.opengl.GL20.glDeleteShader;
 public abstract class ShaderProgram {
 
     private int id;
-    private int uProjectionMatrix, uViewMatrix, uWorldMatrix;
-
     private UniformManager uniformManager;
 
     public ShaderProgram(String vsPath, String fsPath) throws Exception {
@@ -26,14 +22,10 @@ public abstract class ShaderProgram {
 
         delete(vs, fs);
 
-        uProjectionMatrix = getUniformManager().getLocation("projectionMatrix");
-        uViewMatrix = getUniformManager().getLocation("viewMatrix");
-        uWorldMatrix = getUniformManager().getLocation("worldMatrix");
-
         getUniformLocations(getUniformManager());
     }
 
-    public abstract void getUniformLocations(UniformManager uniformManager) throws Exception;
+    public abstract void getUniformLocations(UniformManager uniformManager);
 
     private int compile(String path, int type) throws IOException {
         String vsCode = new String(Files.readAllBytes(Paths.get(path)));
@@ -75,18 +67,6 @@ public abstract class ShaderProgram {
 
     public UniformManager getUniformManager() {
         return uniformManager;
-    }
-
-    public void setProjectionMatrix(Matrix4f projectionMatrix) {
-        getUniformManager().setUniform(uProjectionMatrix, projectionMatrix);
-    }
-
-    public void setViewMatrix(Matrix4f viewMatrix) {
-        getUniformManager().setUniform(uViewMatrix, viewMatrix);
-    }
-
-    public void setWorldMatrix(Matrix4f worldMatrix) {
-        getUniformManager().setUniform(uWorldMatrix, worldMatrix);
     }
 
     public void unbind() {

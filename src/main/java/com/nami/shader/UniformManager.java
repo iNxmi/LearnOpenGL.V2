@@ -6,7 +6,7 @@ import org.lwjgl.BufferUtils;
 
 import java.nio.FloatBuffer;
 
-import static org.lwjgl.opengl.GL30.*;
+import static org.lwjgl.opengl.GL46.*;
 
 public class UniformManager {
 
@@ -16,10 +16,12 @@ public class UniformManager {
         this.shader = shader;
     }
 
-    public int getLocation(String name) throws Exception {
+    public int getLocation(String name) {
         int location = glGetUniformLocation(shader.id(), name);
         if (location == -1)
-            throw new Exception("Uniform with name '" + name + "' doesn't exist!");
+            System.err.println("Uniform with name '" + name + "' doesn't exist!");
+        else
+            System.out.println("Uniform with name '" + name + "' successfully found!");
 
         return location;
     }

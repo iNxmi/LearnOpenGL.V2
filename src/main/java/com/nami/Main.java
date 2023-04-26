@@ -1,17 +1,11 @@
 package com.nami;
 
 import com.nami.config.Config;
-import com.nami.entity.Entity;
-import com.nami.light.PointLight;
 import com.nami.loop.GameLoop;
 import com.nami.loop.Loop;
-import com.nami.render.*;
 import com.nami.render.Window;
 import com.nami.scene.MainScene;
 import com.nami.scene.SceneManager;
-import com.nami.shader.light.LightShader;
-import com.nami.shader.object.ObjectShader;
-import org.joml.Vector3f;
 import org.lwjgl.BufferUtils;
 import org.lwjgl.opengl.GL;
 
@@ -32,10 +26,10 @@ public class Main {
     private final SceneManager sceneManager;
     private final GameLoop mainLoop;
     private final Loop generalLoop, renderLoop, updateLoop;
-    private boolean cursor;
+    private static boolean cursor, wireframe, culling = true;
 
     public Main() throws Exception {
-        this.config = Config.load("./src/main/java/com/nami/config/config.json");
+        this.config = Config.load("config.json");
         System.out.println(config);
 
         window = Window.builder().config(config.window()).title("LearnOpenGL.V2").build();
@@ -47,7 +41,7 @@ public class Main {
         glEnable(GL_DEPTH_TEST);
         glEnable(GL_CULL_FACE);
         glClearColor(0.2f, 0.2f, 0.2f, 1.0f);
-        glPolygonMode(GL_FRONT, GL_FILL);
+        glEnable(GL_TEXTURE_2D);
 
         System.out.println("OpenGL Version: " + glGetString(GL_VERSION));
 
@@ -161,6 +155,33 @@ public class Main {
 
             System.out.println("Screenshot saved! " + file.getAbsolutePath());
         }
+
+        //Toggle glPolygonMode
+        if (key == GLFW_KEY_F3) {
+            glPolygonMode(GL_FRONT_AND_BACK, wireframe ? GL_FILL : GL_LINE);
+            wireframe = !wireframe;
+        }
+
+        //Toggle glCullFace
+        if (key == GLFW_KEY_F4) {
+            if (culling)
+                glDisable(GL_CULL_FACE);
+            else
+                glEnable(GL_CULL_FACE);
+            culling = !culling;
+        }
+    }
+
+    public static boolean isCursorEnabled() {
+        return cursor;
+    }
+
+    public static boolean isWireframeEnabled() {
+        return wireframe;
+    }
+
+    public static boolean isCullingEnabled() {
+        return culling;
     }
 
     public static void main(String[] args) {

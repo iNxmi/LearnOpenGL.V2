@@ -1,25 +1,12 @@
-package com.nami.render;
+package com.nami.camera;
 
 import org.joml.Matrix4f;
 import org.joml.Vector3f;
 
-public class Camera {
+public abstract class Camera {
 
     private final Vector3f UP = new Vector3f(0.0f, 1.0f, 0.0f);
-    private final Vector3f position;
-    private float fov, aspect, zNear, zFar, yaw, pitch;
-
-    public Camera(Vector3f position, float fovDeg, float aspect, float zNear, float zFar, float yawDeg, float pitchDeg) {
-        this.position = position;
-
-        this.fov = (float) Math.toRadians(fovDeg);
-        this.aspect = aspect;
-        this.zNear = zNear;
-        this.zFar = zFar;
-
-        this.yaw = (float) Math.toRadians(yawDeg);
-        this.pitch = (float) Math.toRadians(pitchDeg);
-    }
+    public Vector3f position = new Vector3f(0, 0, 0);
 
     public Vector3f getPosition() {
         return position;
@@ -87,48 +74,9 @@ public class Camera {
         return viewMatrix;
     }
 
-    private final Matrix4f projectionMatrix = new Matrix4f();
-    private float oFov, oAspect, oZNear, oZFar;
-    private boolean pm = false;
+    public abstract Matrix4f getProjectionMatrix();
 
-    public Matrix4f getProjectionMatrix() {
-        float fov = getFovRad(), aspect = getAspect(), zNear = getZNear(), zFar = getZFar();
-        if (fov == oFov && aspect == oAspect && zNear == oZNear && zFar == oZFar && pm)
-            return projectionMatrix;
-
-        projectionMatrix.identity();
-        projectionMatrix.perspective(fov, aspect, zNear, zFar);
-
-        oFov = fov;
-        oAspect = aspect;
-        oZNear = zNear;
-        oZFar = zFar;
-
-        if (!pm)
-            pm = true;
-
-        return projectionMatrix;
-    }
-
-    public float getFovDeg() {
-        return (float) Math.toDegrees(fov);
-    }
-
-    public float getFovRad() {
-        return fov;
-    }
-
-    public void setFov(float fovDeg) {
-        this.fov = (float) Math.toRadians(fovDeg);
-    }
-
-    public float getAspect() {
-        return aspect;
-    }
-
-    public void setAspect(float aspect) {
-        this.aspect = aspect;
-    }
+    private float zNear = 0.1f;
 
     public float getZNear() {
         return zNear;
@@ -138,6 +86,8 @@ public class Camera {
         this.zNear = zNear;
     }
 
+    private float zFar = 1000.0f;
+
     public float getZFar() {
         return zFar;
     }
@@ -145,6 +95,8 @@ public class Camera {
     public void setZFar(float zFar) {
         this.zFar = zFar;
     }
+
+    private float yaw;
 
     public float getYawDeg() {
         return (float) Math.toDegrees(yaw);
@@ -154,9 +106,12 @@ public class Camera {
         return yaw;
     }
 
+
     public void setYaw(float yawDeg) {
         this.yaw = (float) Math.toRadians(yawDeg);
     }
+
+    private float pitch;
 
     public float getPitchDeg() {
         return (float) Math.toDegrees(pitch);

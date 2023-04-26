@@ -15,8 +15,6 @@ public abstract class Scene {
         return window;
     }
 
-    public abstract int id();
-
     public abstract void render(Loop loop);
 
     public abstract void update(Loop loop);
@@ -26,5 +24,7 @@ public abstract class Scene {
     public abstract void onCursorPos(float x, float y);
 
     public abstract void onScroll(float v, float v1);
+
+    public abstract int id();
 
 }

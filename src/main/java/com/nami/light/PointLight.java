@@ -1,16 +1,13 @@
 package com.nami.light;
 
-import com.nami.entity.GameObject;
-import com.nami.render.Mesh;
-import com.nami.shader.light.LightShader;
 import org.joml.Vector3f;
 
-public class PointLight extends GameObject {
+public class PointLight {
 
-    private Mesh mesh;
+    private final Vector3f position = new Vector3f(0, 0, 0);
 
-    public PointLight(Mesh mesh) {
-        this.mesh = mesh;
+    public Vector3f getPosition() {
+        return position;
     }
 
     private Vector3f color = new Vector3f(1, 1, 1);
@@ -19,12 +16,10 @@ public class PointLight extends GameObject {
         return color;
     }
 
-    public void render(LightShader shader) {
-        shader.bind();
-        shader.setWorldMatrix(getWorldMatrix());
-        shader.setLightColor(getColor());
-        mesh.render();
-        shader.unbind();
+    private Vector3f attenuation = new Vector3f(1.0f, 0.14f, 0.07f);
+
+    public Vector3f getAttenuation() {
+        return attenuation;
     }
 
 }
