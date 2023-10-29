@@ -9,27 +9,10 @@ public class PerspectiveCamera extends Camera {
         this.aspect = aspect;
     }
 
-    private final Matrix4f projectionMatrix = new Matrix4f();
-    private float oFov, oAspect, oZNear, oZFar;
-    private boolean pm = false;
-
     public Matrix4f getProjectionMatrix() {
-        float fov = getFovRad(), aspect = getAspect(), zNear = getZNear(), zFar = getZFar();
-        if (fov == oFov && aspect == oAspect && zNear == oZNear && zFar == oZFar && pm)
-            return projectionMatrix;
-
-        projectionMatrix.identity();
-        projectionMatrix.perspective(fov, aspect, zNear, zFar);
-
-        oFov = fov;
-        oAspect = aspect;
-        oZNear = zNear;
-        oZFar = zFar;
-
-        if (!pm)
-            pm = true;
-
-        return projectionMatrix;
+        Matrix4f mat = new Matrix4f();
+        mat.perspective(fov, aspect, getZNear(), getZFar());
+        return mat;
     }
 
     private float fov;

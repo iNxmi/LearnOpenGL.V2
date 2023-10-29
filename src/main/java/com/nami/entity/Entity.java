@@ -1,6 +1,6 @@
 package com.nami.entity;
 
-import com.nami.render.world.Model;
+import com.nami.graphics.render.Model;
 import org.joml.Matrix4f;
 import org.joml.Vector3f;
 
@@ -34,29 +34,14 @@ public class Entity {
         return scale;
     }
 
-    private final Matrix4f transformationMatrix = new Matrix4f();
-    private final Vector3f oPos = new Vector3f(), oRot = new Vector3f(), oSca = new Vector3f();
-    private boolean wm = false;
-
     public Matrix4f getTransformationMatrix() {
-        if (oPos.equals(getPosition()) && oRot.equals(getRotation()) && oSca.equals(getScale()) && wm)
-            return transformationMatrix;
-
-        transformationMatrix.identity();
-        transformationMatrix.translate(getPosition());
-        transformationMatrix.rotateX((float) Math.toRadians(getRotation().x()));
-        transformationMatrix.rotateY((float) Math.toRadians(getRotation().y()));
-        transformationMatrix.rotateZ((float) Math.toRadians(getRotation().z()));
-        transformationMatrix.scale(getScale());
-
-        oPos.set(getPosition());
-        oRot.set(getRotation());
-        oSca.set(getScale());
-
-        if (!wm)
-            wm = true;
-
-        return transformationMatrix;
+        Matrix4f mat = new Matrix4f();
+        mat.translate(getPosition());
+        mat.rotateX((float) Math.toRadians(getRotation().x()));
+        mat.rotateY((float) Math.toRadians(getRotation().y()));
+        mat.rotateZ((float) Math.toRadians(getRotation().z()));
+        mat.scale(getScale());
+        return mat;
     }
 
 }

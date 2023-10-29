@@ -5,73 +5,26 @@ import org.joml.Vector3f;
 
 public abstract class Camera {
 
-    private final Vector3f UP = new Vector3f(0.0f, 1.0f, 0.0f);
+    private final Vector3f UP = new Vector3f(0, 1, 0);
     public Vector3f position = new Vector3f(0, 0, 0);
 
-    public Vector3f getPosition() {
-        return position;
+    public Vector3f getViewDirection() {
+        Vector3f vec = new Vector3f();
+        vec.set(Math.cos(yaw) * Math.cos(pitch), Math.sin(pitch), Math.sin(yaw) * Math.cos(pitch));
+        vec.normalize();
+        return vec;
     }
-
-    private final Vector3f front = new Vector3f();
-    private float oYaw, oPitch;
-    private boolean f = false;
-
-    public Vector3f getFront() {
-        float yaw = getYawRad(), pitch = getPitchRad();
-        if (oYaw == yaw && oPitch == pitch && f)
-            return front;
-
-        front.set(Math.cos(yaw) * Math.cos(pitch), Math.sin(pitch), Math.sin(yaw) * Math.cos(pitch));
-        front.normalize();
-
-        oYaw = yaw;
-        oPitch = pitch;
-
-        if (!f)
-            f = true;
-
-        return front;
-    }
-
-    private final Vector3f target = new Vector3f();
-    private final Vector3f oPos = new Vector3f(), oFront = new Vector3f();
-    private boolean t = false;
 
     public Vector3f getTarget() {
-        Vector3f position = getPosition(), front = getFront();
-        if (oPos.equals(position) && oFront.equals(front) && t)
-            return target;
-
-        position.add(front, target);
-
-        oPos.set(position);
-        oFront.set(front);
-
-        if (!t)
-            t = true;
-
-        return target;
+        Vector3f vec = new Vector3f(getViewDirection());
+        vec.add(position);
+        return vec;
     }
 
-    private final Matrix4f viewMatrix = new Matrix4f();
-    private final Vector3f oTar = new Vector3f();
-    private boolean vm = false;
-
     public Matrix4f getViewMatrix() {
-        Vector3f position = getPosition(), target = getTarget();
-        if (oPos.equals(position, 0) && oTar.equals(target, 0) && vm)
-            return viewMatrix;
-
-        viewMatrix.identity();
-        viewMatrix.lookAt(position, target, UP);
-
-        oPos.set(position);
-        oTar.set(target);
-
-        if (!vm)
-            vm = true;
-
-        return viewMatrix;
+        Matrix4f mat = new Matrix4f();
+        mat.lookAt(position, getTarget(), UP);
+        return mat;
     }
 
     public abstract Matrix4f getProjectionMatrix();
@@ -86,7 +39,7 @@ public abstract class Camera {
         this.zNear = zNear;
     }
 
-    private float zFar = 1000.0f;
+    private float zFar = 100000.0f;
 
     public float getZFar() {
         return zFar;

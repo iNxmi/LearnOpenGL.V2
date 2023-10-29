@@ -1,15 +1,16 @@
 package com.nami;
 
-import com.nami.config.Config;
-import com.nami.loop.GameLoop;
-import com.nami.loop.Loop;
-import com.nami.render.Window;
-import com.nami.scene.MainScene;
+import com.nami.graphics.render.Window;
+import com.nami.mlib.Folder;
+import com.nami.mlib.config.Config;
+import com.nami.mlib.config.Value;
+import com.nami.mlib.os.OSProps;
+import com.nami.scene.scenes.MainScene;
 import com.nami.scene.SceneManager;
+import com.nami.util.Exporter;
 import org.lwjgl.BufferUtils;
 import org.lwjgl.opengl.GL;
 
-import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
@@ -21,167 +22,295 @@ import static org.lwjgl.opengl.GL33.*;
 
 public class Main {
 
+    public static Folder FOLDER_ROOT;
     private final Config config;
     private final Window window;
     private final SceneManager sceneManager;
-    private final GameLoop mainLoop;
-    private final Loop generalLoop, renderLoop, updateLoop;
-    private static boolean cursor, wireframe, culling = true;
+
+    private static int polygonMode = 0;
+    private static boolean cursor, culling = true;
 
     public Main() throws Exception {
-        this.config = Config.load("config.json");
-        System.out.println(config);
+        if (!OSProps.init("learn-opengl-v2"))
+            throw new IllegalStateException("Unsupported OS!");
+        FOLDER_ROOT = OSProps.FOLDER_ROOT;
 
-        window = Window.builder().config(config.window()).title("LearnOpenGL.V2").build();
-        window.init();
+        this.config = Config.builder().
+                setFile(FOLDER_ROOT.file("config.prop")).
+                setDefaults(
+                        Value.of("window_width", 1920),
+                        Value.of("window_height", 1080),
+                        Value.of("window_monitor", 0),
+                        Value.of("window_fullscreen", false),
+
+                        Value.of("aspect_width", 16),
+                        Value.of("aspect_height", 9),
+
+                        Value.of("fov", 70),
+                        Value.of("sensivity", 0.1),
+
+                        Value.of("controls_forward", 87),
+                        Value.of("controls_backward", 83),
+
+                        Value.of("controls_left", 65),
+                        Value.of("controls_right", 68),
+
+                        Value.of("controls_up", 32),
+                        Value.of("controls_down", 341),
+
+                        Value.of("controls_sprint", 340),
+
+                        Value.of("controls_exit", 256),
+                        Value.of("controls_screenshot", 291),
+                        Value.of("controls_fullscreen", 300)
+                ).
+                build();
+
+        window = Window.builder().
+                size(config.get("window_width").asInt(), config.get("window_height").asInt()).
+                fullscreen(config.get("window_fullscreen").asBoolean()).
+                monitor(config.get("window_monitor").asInt()).
+                title("LearnOpenGL.V2").
+                build().init();
 
         glfwMakeContextCurrent(window.id());
 
         GL.createCapabilities();
         glEnable(GL_DEPTH_TEST);
         glEnable(GL_CULL_FACE);
-        glClearColor(0.2f, 0.2f, 0.2f, 1.0f);
+        glClearColor(50f / 255f, 51f / 255f, 56f / 255f, 1);
         glEnable(GL_TEXTURE_2D);
 
         System.out.println("OpenGL Version: " + glGetString(GL_VERSION));
 
-        glfwSetFramebufferSizeCallback(window.id(), (window, width, height) -> glViewport(0, 0, width, height));
-        glfwSetInputMode(window.id(), GLFW_CURSOR, GLFW_CURSOR_DISABLED);
-        glfwSetCursorPosCallback(window.id(), (win, x, y) -> onCursorPos((float) x, (float) y));
-        glfwSetScrollCallback(window.id(), (win, v, v1) -> onScroll((float) v, (float) v1));
+        glfwSetErrorCallback(this::onErrorCallback);
+        glfwSetMonitorCallback(this::onMonitorCallback);
+        glfwSetWindowPosCallback(window.id(), this::onWindowPosCallback);
+        glfwSetWindowSizeCallback(window.id(), this::onWindowSizeCallback);
+        glfwSetWindowCloseCallback(window.id(), this::onWindowCloseCallback);
+        glfwSetWindowRefreshCallback(window.id(), this::onWindowRefreshCallback);
+        glfwSetWindowFocusCallback(window.id(), this::onWindowFocusCallback);
+        glfwSetWindowIconifyCallback(window.id(), this::onWindowIconifyCallback);
+        glfwSetWindowMaximizeCallback(window.id(), this::onWindowMaximizeCallback);
+        glfwSetFramebufferSizeCallback(window.id(), this::onFramebufferSizeCallback);
+        glfwSetWindowContentScaleCallback(window.id(), this::onWindowContentScaleCallback);
         glfwSetKeyCallback(window.id(), this::onKeyCallback);
+        glfwSetCharCallback(window.id(), this::onCharCallback);
+        glfwSetCharModsCallback(window.id(), this::onCharModsCallback);
+        glfwSetMouseButtonCallback(window.id(), this::onMouseButtonCallback);
+        glfwSetCursorPosCallback(window.id(), this::onCursorPosCallback);
+        glfwSetCursorEnterCallback(window.id(), this::onCursorEnterCallback);
+        glfwSetScrollCallback(window.id(), this::onScrollCallback);
+        glfwSetDropCallback(window.id(), this::onDropCallback);
+        glfwSetJoystickCallback(this::onJoystickCallback);
+
+        glfwSetInputMode(window.id(), GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 
         sceneManager = new SceneManager();
-        sceneManager.addScene(new MainScene(window, config));
+        float aspect = config.get("aspect_width").asFloat() / config.get("aspect_height").asFloat();
+        sceneManager.addScene("main", new MainScene(window, config.get("sensivity").asFloat(), config.get("fov").asFloat(), aspect));
+        sceneManager.setScene("main");
 
-        mainLoop = new GameLoop();
-        mainLoop.setTerminateCallback(org.lwjgl.glfw.GLFW::glfwTerminate);
+        float renderTime = 1.0f / 144.0f;
+        float lastRenderTime = (float) glfwGetTime();
 
-        //General Loop
-        generalLoop = new Loop(1.0d / 1000.0d, loop -> {
-            glfwPollEvents();
-            input(loop);
+        float updateTime = 1.0f / 20.0f;
+        float lastUpdateTime = (float) glfwGetTime();
 
-            if (glfwWindowShouldClose(window.id()))
-                mainLoop.stop();
-        });
-        mainLoop.register(generalLoop);
-
-        //Render Loop
-        renderLoop = new Loop(1.0d / config.window().fps(), loop -> {
-            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-            render(loop);
-            glfwSwapBuffers(window.id());
-        });
-        mainLoop.register(renderLoop);
-
-        //Update Loop
-        updateLoop = new Loop(1.0d / 20.0d, this::update);
-        mainLoop.register(updateLoop);
+        float lastTime = (float) glfwGetTime();
 
         glfwShowWindow(window.id());
+        while (!glfwWindowShouldClose(window.id())) {
+            glfwPollEvents();
+            processInput((float) glfwGetTime() - lastTime);
 
-        mainLoop.run();
+            if (glfwGetTime() - lastRenderTime >= renderTime) {
+                glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+                render((float) glfwGetTime() - lastRenderTime);
+                glfwSwapBuffers(window.id());
+
+                lastRenderTime = (float) glfwGetTime();
+            }
+
+            if (glfwGetTime() - lastUpdateTime >= updateTime) {
+                update((float) glfwGetTime() - lastUpdateTime);
+
+                lastUpdateTime = (float) glfwGetTime();
+            }
+
+            lastTime = (float) glfwGetTime();
+        }
+
+        glfwTerminate();
     }
 
-    private void render(Loop loop) {
-        sceneManager.render(loop);
+    private void render(float delta) {
+        sceneManager.render(delta);
     }
 
-    private void update(Loop loop) {
-        sceneManager.update(loop);
-
-        glfwSetWindowTitle(window.id(), String.format("LearnOpenGL.V2 | GEN: %s TPS: %s FPS: %s", generalLoop.getCountsPerSecond(), updateLoop.getCountsPerSecond(), renderLoop.getCountsPerSecond()));
+    private void update(float delta) {
+        sceneManager.update(delta);
     }
 
-    private void input(Loop loop) {
-        sceneManager.input(loop);
+    private void processInput(float delta) {
+        sceneManager.processInput(delta);
     }
 
-    private void onCursorPos(float x, float y) {
-        sceneManager.onCursorPos(x, y);
+    public void onErrorCallback(int error, long description) {
+        sceneManager.onErrorCallBack(error, description);
     }
 
-    private void onScroll(float x, float y) {
-        sceneManager.onScroll(x, y);
+    public void onMonitorCallback(long monitor, int event) {
+        sceneManager.onMonitorCallback(monitor, event);
+    }
+
+    private void onWindowPosCallback(long window, int x, int y) {
+        sceneManager.onWindowPosCallback(window, x, y);
+    }
+
+    private void onWindowSizeCallback(long window, int width, int height) {
+        sceneManager.onWindowSizeCallback(window, width, height);
+    }
+
+    private void onWindowCloseCallback(long window) {
+        sceneManager.onWindowCloseCallback(window);
+    }
+
+    private void onWindowRefreshCallback(long window) {
+        sceneManager.onWindowRefreshCallback(window);
+    }
+
+    private void onWindowFocusCallback(long window, boolean focused) {
+        sceneManager.onWindowFocusCallback(window, focused);
+    }
+
+    private void onWindowIconifyCallback(long window, boolean iconified) {
+        sceneManager.onWindowIconifyCallback(window, iconified);
+    }
+
+    private void onWindowMaximizeCallback(long window, boolean maximized) {
+        sceneManager.onWindowMaximizeCallback(window, maximized);
+    }
+
+    private void onFramebufferSizeCallback(long window, int width, int height) {
+        glViewport(0, 0, width, height);
+
+        sceneManager.onFramebufferSizeCallback(window, width, height);
+    }
+
+    private void onWindowContentScaleCallback(long window, float xScale, float yScale) {
+        sceneManager.onWindowContentScaleCallback(window, xScale, yScale);
     }
 
     private void onKeyCallback(long window, int key, int scancode, int action, int mods) {
-        if (action != GLFW_PRESS)
-            return;
+        if (action == GLFW_PRESS) {
+            //Exit
+            if (key == config.get("controls_exit").asInt())
+                glfwSetWindowShouldClose(this.window.id(), true);
 
-        //Exit
-        if (key == config.controls().exit())
-            glfwSetWindowShouldClose(this.window.id(), true);
+            //Fullscreen
+            if (key == config.get("controls_fullscreen").asInt())
+                this.window.setFullscreen(!this.window.isFullscreen());
 
-        //Fullscreen
-        if (key == config.controls().fullscreen())
-            this.window.setFullscreen(!this.window.isFullscreen());
+            //Screenshot
+            if (key == config.get("controls_screenshot").asInt()) {
+                IntBuffer w = BufferUtils.createIntBuffer(1);
+                IntBuffer h = BufferUtils.createIntBuffer(1);
+                glfwGetWindowSize(window, w, h);
+                int width = w.get(0), height = h.get(0);
 
-        //Toggle Cursor
-        if (key == GLFW_KEY_F1) {
-            glfwSetInputMode(window, GLFW_CURSOR, cursor ? GLFW_CURSOR_DISABLED : GLFW_CURSOR_NORMAL);
-            cursor = !cursor;
-        }
+                ByteBuffer buffer = ByteBuffer.allocateDirect(width * height * 3);
+                glReadPixels(0, 0, width, height, GL_RGB, GL_UNSIGNED_BYTE, buffer);
 
-        //Screenshot
-        if (key == config.controls().screenshot()) {
-            IntBuffer w = BufferUtils.createIntBuffer(1);
-            IntBuffer h = BufferUtils.createIntBuffer(1);
-            glfwGetWindowSize(window, w, h);
-            int width = w.get(0), height = h.get(0);
+                int[] pixels = new int[width * height];
+                for (int i = 0; i < pixels.length; i++)
+                    pixels[i] = ((buffer.get() & 0xff) << 16) + ((buffer.get() & 0xff) << 8) + (buffer.get() & 0xff);
 
-            ByteBuffer buffer = ByteBuffer.allocateDirect(width * height * 3);
-            glReadPixels(0, 0, width, height, GL_RGB, GL_UNSIGNED_BYTE, buffer);
+                int[] pixelsFlipped = new int[width * height];
+                for (int y = 0; y < height; y++)
+                    if (width >= 0)
+                        System.arraycopy(pixels, ((height - 1) - y) * width, pixelsFlipped, y * width, width);
 
-            int[] pixels = new int[width * height];
-            for (int i = 0; i < pixels.length; i++)
-                pixels[i] = ((buffer.get() & 0xff) << 16) + ((buffer.get() & 0xff) << 8) + (buffer.get() & 0xff);
+                BufferedImage img = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
+                img.setRGB(0, 0, width, height, pixelsFlipped, 0, width);
 
-            int[] pixelsFlipped = new int[width * height];
-            for (int y = 0; y < height; y++)
-                if (width >= 0)
-                    System.arraycopy(pixels, ((height - 1) - y) * width, pixelsFlipped, y * width, width);
+                File file = new File("E:/Windows/Desktop/" + System.currentTimeMillis() + ".png");
+                try {
+                    Exporter.exportImage(img, file.getPath());
+                } catch (IOException e) {
+                    throw new RuntimeException(e);
+                }
 
-            BufferedImage img = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
-            img.setRGB(0, 0, width, height, pixelsFlipped, 0, width);
-
-            File file = new File("E:/Windows/Desktop/" + System.currentTimeMillis() + ".png");
-            try {
-                ImageIO.write(img, "png", file);
-            } catch (IOException e) {
-                throw new RuntimeException(e);
+                System.out.println("Screenshot saved! " + file.getAbsolutePath());
             }
 
-            System.out.println("Screenshot saved! " + file.getAbsolutePath());
+            //Toggle Cursor
+            if (key == GLFW_KEY_F1) {
+                glfwSetInputMode(window, GLFW_CURSOR, cursor ? GLFW_CURSOR_DISABLED : GLFW_CURSOR_NORMAL);
+                cursor = !cursor;
+            }
+
+            //Toggle glPolygonMode
+            if (key == GLFW_KEY_F3) {
+                final int[] list = new int[]{
+                        GL_FILL, GL_LINE, GL_POINT
+                };
+
+                polygonMode++;
+
+                if (polygonMode > 2)
+                    polygonMode = 0;
+
+                glPolygonMode(GL_FRONT_AND_BACK, list[polygonMode]);
+            }
+
+            //Toggle glCullFace
+            if (key == GLFW_KEY_F4) {
+                if (culling)
+                    glDisable(GL_CULL_FACE);
+                else
+                    glEnable(GL_CULL_FACE);
+                culling = !culling;
+            }
         }
 
-        //Toggle glPolygonMode
-        if (key == GLFW_KEY_F3) {
-            glPolygonMode(GL_FRONT_AND_BACK, wireframe ? GL_FILL : GL_LINE);
-            wireframe = !wireframe;
-        }
+        sceneManager.onKeyCallback(window, key, scancode, action, mods);
+    }
 
-        //Toggle glCullFace
-        if (key == GLFW_KEY_F4) {
-            if (culling)
-                glDisable(GL_CULL_FACE);
-            else
-                glEnable(GL_CULL_FACE);
-            culling = !culling;
-        }
+    private void onCharCallback(long window, int codepoint) {
+        sceneManager.onCharCallback(window, codepoint);
+    }
+
+    private void onCharModsCallback(long window, int codepoint, int mods) {
+        sceneManager.onCharModsCallback(window, codepoint, mods);
+    }
+
+    private void onMouseButtonCallback(long window, int button, int action, int mods) {
+        sceneManager.onMouseButtonCallback(window, button, action, mods);
+    }
+
+    private void onCursorPosCallback(long window, double x, double y) {
+        sceneManager.onCursorPosCallback(window, x, y);
+    }
+
+    private void onCursorEnterCallback(long window, boolean entered) {
+        sceneManager.onCursorEnterCallback(window, entered);
+    }
+
+    private void onScrollCallback(long window, double xOffset, double yOffset) {
+        sceneManager.onScrollCallback(window, xOffset, yOffset);
+    }
+
+    private void onDropCallback(long window, int count, long names) {
+        sceneManager.onDropCallback(window, count, names);
+    }
+
+    private void onJoystickCallback(int jid, int event) {
+        sceneManager.onJoystickCallback(jid, event);
     }
 
     public static boolean isCursorEnabled() {
         return cursor;
-    }
-
-    public static boolean isWireframeEnabled() {
-        return wireframe;
-    }
-
-    public static boolean isCullingEnabled() {
-        return culling;
     }
 
     public static void main(String[] args) {

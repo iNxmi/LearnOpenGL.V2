@@ -8,11 +8,10 @@
     },
     "monitor": "0",
     "fps": "144",
-    "vsync": "true",
     "fullscreen": "false"
   },
   "user": {
-    "fov": "90",
+    "fov": "70",
     "sensivity": "0.1"
   },
   "controls": {
